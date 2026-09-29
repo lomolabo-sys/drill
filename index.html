@@ -122,9 +122,9 @@ async function load(){
     const r=await fetch("questions.json?t="+Date.now(),{cache:"no-store"});
     if(!r.ok)throw 0; data=await r.json();
   }catch(e){app.innerHTML='<p class="center">問題を読みこめませんでした。電波のいい所でページを開き直してください。</p>';return}
-  const done=store("result-"+data.date);
+  const done=store("result-"+(data.id||data.date));
   if(done){renderResult(done);return}
-  answers=store("draft-"+data.date)||{};
+  answers=store("draft-"+(data.id||data.date))||{};
   renderQuiz();
 }
 
@@ -159,7 +159,7 @@ function renderQuiz(){
     if(t.type==="radio")answers[t.name.slice(1)]=t.value;
     else if(t.dataset.i)answers[t.dataset.i]=t.value;
     else return;
-    store("draft-"+data.date,answers); disarm(); update();
+    store("draft-"+(data.id||data.date),answers); disarm(); update();
   };
   app.addEventListener("input",onEdit); app.addEventListener("change",onEdit);
   update();
@@ -188,7 +188,7 @@ document.getElementById("grade").addEventListener("click",()=>{
     else wrong.push({s:q.s,q:q.q,you:answered(i)?(q.t==="c"?q.c[answers[i]]:answers[i]):"（空欄）",ans:q.t==="c"?q.c[q.a]:q.a[0]});
   });
   const res={date:data.date,score,total:data.questions.length,pass:data.pass,per,wrong,at:new Date().toISOString()};
-  store("result-"+data.date,res);
+  store("result-"+(data.id||data.date),res);
   renderResult(res); window.scrollTo(0,0);
 });
 
