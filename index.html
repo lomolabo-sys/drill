@@ -120,10 +120,11 @@ function correct(q,i){
 function fmtDate(d){const [y,m,dd]=d.split("-").map(Number);const w="日月火水木金土"[new Date(y,m-1,dd).getDay()];return `${m}月${dd}日（${w}）`}
 
 async function load(){
-  try{
-    const r=await fetch("questions.json?t="+Date.now(),{cache:"no-store"});
-    if(!r.ok)throw 0; data=await r.json();
-  }catch(e){app.innerHTML='<p class="center">問題を読みこめませんでした。電波のいい所でページを開き直してください。</p>';return}
+  const get=async u=>{const r=await fetch(u+"?t="+Date.now(),{cache:"no-store"});if(!r.ok)throw 0;return r.json()};
+  const got=await Promise.allSettled([get("https://raw.githubusercontent.com/lomolabo-sys/drill/main/questions.json"),get("questions.json")]);
+  const ok=got.filter(g=>g.status==="fulfilled"&&g.value&&g.value.questions).map(g=>g.value);
+  if(!ok.length){app.innerHTML='<p class="center">問題を読みこめませんでした。電波のいい所でページを開き直してください。</p>';return}
+  data=ok.sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
   const done=store("result-"+(data.id||data.date));
   if(done){renderResult(done);return}
   answers=store("draft-"+(data.id||data.date))||{};
