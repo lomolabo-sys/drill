@@ -84,6 +84,8 @@ button.warn{background:var(--ng);color:#fff}
 .wrong .tag{font-size:12px;color:var(--muted)}
 .wrong .you{color:var(--ng);font-size:14px}
 .wrong .ans{color:var(--ok);font-weight:700;font-size:14px}
+.wrong .exp{font-size:14px;line-height:1.7;background:var(--accent-soft);border-radius:8px;padding:8px 10px;margin-top:4px}
+.wrong .exp b{color:var(--accent)}
 .center{padding:40px 0;text-align:center;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 html{scroll-behavior:smooth}
@@ -185,13 +187,14 @@ document.getElementById("grade").addEventListener("click",()=>{
   SUBJ.forEach(s=>per[s]=[0,0]);
   data.questions.forEach((q,i)=>{
     const ok=correct(q,i); per[q.s][1]++; if(ok){per[q.s][0]++;score++}
-    else wrong.push({s:q.s,q:q.q,you:answered(i)?(q.t==="c"?q.c[answers[i]]:answers[i]):"（空欄）",ans:q.t==="c"?q.c[q.a]:q.a[0]});
+    else wrong.push({s:q.s,q:q.q,you:answered(i)?(q.t==="c"?q.c[answers[i]]:answers[i]):"（空欄）",ans:q.t==="c"?q.c[q.a]:q.a[0],e:q.e||""});
   });
   const res={date:data.date,score,total:data.questions.length,pass:data.pass,per,wrong,at:new Date().toISOString()};
   store("result-"+(data.id||data.date),res);
   renderResult(res); window.scrollTo(0,0);
 });
 
+function expOf(w){if(w.e)return w.e;const q=data&&data.questions&&data.questions.find(x=>x.q===w.q);return q&&q.e||""}
 function renderResult(r){
   bar.hidden=true;
   const ok=r.score>=r.pass, t=new Date(r.at);
@@ -206,7 +209,7 @@ function renderResult(r){
   html+="</div>";
   if(r.wrong.length){
     html+=`<h2>まちがえた問題<span>${r.wrong.length}問</span></h2>`;
-    r.wrong.forEach(w=>html+=`<div class="wrong"><span class="tag">${w.s}</span><span>${esc(w.q)}</span><span class="you">きみの答え：${esc(w.you)}</span><span class="ans">正解：${esc(w.ans)}</span></div>`);
+    r.wrong.forEach(w=>html+=`<div class="wrong"><span class="tag">${w.s}</span><span>${esc(w.q)}</span><span class="you">きみの答え：${esc(w.you)}</span><span class="ans">正解：${esc(w.ans)}</span>${expOf(w)?`<span class="exp"><b>解説</b>　${esc(expOf(w))}</span>`:""}</div>`);
   }
   html+=`<p class="rule">明日の朝、新しい50問に変わります。</p></div>`;
   app.innerHTML=html;
