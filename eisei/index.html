@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<title>第一種衛生管理者 模試</title>
+<title>衛生管理者 問題集</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
@@ -163,14 +163,57 @@ async function route(){
 window.addEventListener("hashchange",route);
 app.addEventListener("change",e=>onPick(e));
 
+/* ---------- daily ---------- */
+let DAILY=null;
+async function loadDaily(){if(DAILY)return DAILY;try{DAILY=await getJSON("daily.json")}catch(e){DAILY=null}return DAILY}
+function fmtDay(d){const [y,m,dd]=d.split("-").map(Number);return `${m}月${dd}日（${"日月火水木金土"[new Date(y,m-1,dd).getDay()]}）`}
+function shortDay(d){const [,m,dd]=d.split("-").map(Number);return `${m}/${dd}`}
+function streak(dh){
+  const d=new Date(); if(!dh[ymd(d)])d.setDate(d.getDate()-1);
+  let n=0; while(dh[ymd(d)]){n++;d.setDate(d.getDate()-1)}
+  return n;
+}
+function ymd(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+
+/* ---------- note ---------- */
+function noteKeys(){
+  const n=store("eisei-note")||{};
+  const mk=Object.entries(n).flatMap(([id,arr])=>SETS.some(s=>s.id===id)?arr.map(i=>id+":"+i):[]);
+  return mk.concat(Object.keys(store("eisei-dnote")||{}));
+}
+function labelOf(key,inReview){
+  const p=key.split(":");
+  if(p[0]==="d")return inReview?`${shortDay(p[1])}の問題 ${+p[2]+1}`:`問${+p[2]+1}`;
+  return inReview?`${setTitle(p[0]).replace("模試 ","")} 問${+p[1]+1}`:`問${+p[1]+1}`;
+}
+async function qOf(key){
+  const p=key.split(":");
+  if(p[0]==="d"){const dn=store("eisei-dnote")||{};if(dn[key])return dn[key];const d=await loadDaily();return d&&d.date===p[1]?d.questions[+p[2]]:null}
+  const d=await loadSet(p[0]);return d.questions[+p[1]];
+}
+
 /* ---------- home ---------- */
-function noteKeys(){const n=store("eisei-note")||{};return Object.entries(n).flatMap(([id,arr])=>SETS.some(s=>s.id===id)?arr.map(i=>id+":"+i):[])}
-function home(){
-  const nk=noteKeys();
-  let h=`<header><span class="eyebrow">本試験形式　44問・5択・3時間</span><h1>第一種衛生管理者 模試</h1>
-  <p class="rule">合格ライン：<b>5つの範囲すべてで40%以上</b>、かつ<b>合計240点（60%）以上</b>。配点は有害業務の2範囲が1問8点、ほかは1問10点。</p></header>`;
-  if(nk.length)h+=`<div class="card note"><div class="t">まちがいノート　${nk.length}問</div><span class="meta">最後に解いたときに間違えた問題です。正解すると消えます。</span><div class="row"><a class="btn" href="#/q/review" data-new="review">まちがいだけ解き直す</a></div></div>`;
-  h+=`<h2>模試<span>${SETS.length}回分</span></h2>`;
+async function home(){
+  const nk=noteKeys(), daily=await loadDaily();
+  const dh=store("eisei-dhist")||{};
+  let h=`<header><span class="eyebrow">第一種衛生管理者</span><h1>衛生管理者 問題集</h1>
+  <p class="rule">本番の合格ライン：<b>5つの範囲すべてで40%以上</b>、かつ<b>合計60%以上</b>。</p></header>`;
+  if(daily){
+    const res=store("eisei-res-daily"), done=res&&res.date===daily.date, dr=store("eisei-draft-daily");
+    const st=streak(dh);
+    h+=`<div class="card"><div class="row"><span class="t">今日の${daily.questions.length}問</span><span class="meta">${fmtDay(daily.date)}</span>`;
+    if(done)h+=`<span class="pill ${res.c/res.n>=0.6?"pass":"fail"}">${res.c}/${res.n} 正解</span>`;
+    h+=`</div><span class="meta">${done?"今日の分は解き終わりました。":"毎朝5時半ごろ新しい問題に変わります。"}${st?`　連続 ${st}日`:""}</span>`;
+    const last=Object.keys(dh).sort().slice(-7);
+    if(last.length)h+=`<div class="hist">${last.map(d=>`<span>${shortDay(d)}　${dh[d].c}/${dh[d].n}</span>`).join("")}</div>`;
+    h+=`<div class="row">`;
+    if(!done&&dr&&dr.date===daily.date&&Object.keys(dr.ans||{}).length)h+=`<a class="btn" href="#/q/daily">続きから（${Object.keys(dr.ans).length}問回答済み）</a>`;
+    else if(!done)h+=`<a class="btn" href="#/q/daily" data-new="daily">今日の問題を解く</a>`;
+    else h+=`<a class="btn" href="#/r/daily">結果と解説</a><a class="btn sub" href="#/q/daily" data-new="daily">もう一度解く</a>`;
+    h+=`</div></div>`;
+  }
+  if(nk.length)h+=`<div class="card note"><div class="t">まちがいノート　${nk.length}問</div><span class="meta">今日の問題と模試で間違えた問題です。正解すると消えます。</span><div class="row"><a class="btn" href="#/q/review" data-new="review">まちがいだけ解き直す</a></div></div>`;
+  h+=`<h2>模試<span>本試験形式　44問・3時間</span></h2>`;
   SETS.forEach(s=>{
     const res=store("eisei-res-"+s.id), dr=store("eisei-draft-"+s.id), hist=store("eisei-hist-"+s.id)||[];
     h+=`<div class="card"><div class="row"><span class="t">${esc(s.title)}</span>`;
@@ -184,7 +227,7 @@ function home(){
     if(res)h+=`<a class="btn sub" href="#/r/${s.id}">前回の結果と解説</a>`;
     h+=`</div></div>`;
   });
-  h+=`<p class="rule">選択肢の並びは解くたびに入れ替わります。記録はこの端末のブラウザに保存されます。</p>`;
+  h+=`<p class="rule">模試の配点は有害業務の2範囲が1問8点、ほかは1問10点。選択肢の並びは解くたびに入れ替わります。記録はこの端末のブラウザに保存されます。</p>`;
   app.innerHTML=h;
   app.querySelectorAll("[data-restart]").forEach(b=>b.onclick=()=>{store("eisei-draft-"+b.dataset.restart,null);location.hash="#/q/"+b.dataset.restart});
   app.querySelectorAll("[data-new]").forEach(a=>a.onclick=()=>store("eisei-draft-"+a.dataset.new,null));
@@ -195,38 +238,47 @@ async function itemsFor(id,draft){
   if(id==="review"){
     const keys=draft&&draft.items?draft.items:noteKeys();
     const out=[];
-    for(const k of keys){const [sid,i]=k.split(":");const d=await loadSet(sid);const q=d.questions[+i];if(q)out.push({key:k,sid,qi:+i,q,label:`${setTitle(sid).replace("模試 ","")} 問${+i+1}`})}
+    for(const k of keys){const q=await qOf(k);if(q)out.push({key:k,q,label:labelOf(k,true)})}
     return out.sort((a,b)=>a.q.r-b.q.r);
   }
+  if(id==="daily"){
+    const d=await loadDaily(); if(!d)throw new Error("nodaily");
+    return d.questions.map((q,i)=>{const k=`d:${d.date}:${i}`;return {key:k,q,label:labelOf(k)}});
+  }
   const d=await loadSet(id);
-  return d.questions.map((q,i)=>({key:id+":"+i,sid:id,qi:i,q,label:`問${i+1}`}));
+  return d.questions.map((q,i)=>({key:id+":"+i,q,label:`問${i+1}`}));
 }
 
 /* ---------- quiz ---------- */
 async function quiz(id){
   const dk="eisei-draft-"+id;
   let draft=store(dk);
+  const daily=id==="daily"?await loadDaily():null;
+  if(draft&&daily&&draft.date!==daily.date)draft=null;
   if(!draft){
     const t=(store("eisei-try-"+id)||0)+1; store("eisei-try-"+id,t);
     draft={start:Date.now(),try:t,ans:{}};
+    if(daily)draft.date=daily.date;
     if(id==="review"){draft.items=noteKeys();if(!draft.items.length){location.hash="#/";return}}
     store(dk,draft);
   }
   const items=await itemsFor(id,draft);
   cur={id,items,draft,dk};
-  const title=id==="review"?"まちがいノート":setTitle(id);
-  let h=`<header><span class="eyebrow">${id==="review"?"解き直し":"本試験形式"}</span><h1>${esc(title)}</h1>
-  <p class="rule">${id==="review"?"正解した問題はノートから消えます。":"5つの範囲すべてで40%以上、合計60%以上で合格。"}　<a href="#/" style="color:var(--accent)">一覧へ戻る</a></p></header><nav>`;
+  const title=id==="review"?"まちがいノート":id==="daily"?`今日の${items.length}問`:setTitle(id);
+  const eye=id==="review"?"解き直し":id==="daily"?fmtDay(daily.date):"本試験形式";
+  const rule=id==="review"?"正解した問題はノートから消えます。":id==="daily"?"間違えた問題は、まちがいノートに入ります。":"5つの範囲すべてで40%以上、合計60%以上で合格。";
+  let h=`<header><span class="eyebrow">${eye}</span><h1>${esc(title)}</h1>
+  <p class="rule">${rule}　<a href="#/" style="color:var(--accent)">一覧へ戻る</a></p></header><nav>`;
   const used=R.map((_,r)=>items.some(it=>it.q.r===r));
   R.forEach((x,r)=>{if(used[r])h+=`<a href="#s${r}" data-r="${r}" onclick="event.preventDefault();document.getElementById('s${r}').scrollIntoView()">${x.short}<small>0/0</small></a>`});
   h+="</nav>";
   R.forEach((x,r)=>{
     const its=items.filter(it=>it.q.r===r); if(!its.length)return;
-    h+=`<section id="s${r}"><h2>${rname(r)}<span>${its.length}問・1問${x.p}点</span></h2>`;
+    h+=`<section id="s${r}"><h2>${rname(r)}<span>${its.length}問${id==="review"||id==="daily"?"":`・1問${x.p}点`}</span></h2>`;
     its.forEach(it=>{
       h+=`<div class="q"><div class="qhead"><span class="num">${esc(it.label)}</span><p class="qtext">${esc(it.q.q)}</p></div><div class="choices">`;
+      const nm="k"+it.key.replace(/[^\w]/g,"_");
       order(it.key+"#"+draft.try,it.q.c.length).forEach((ci,pos)=>{
-        const nm="k"+it.key.replace(":","_");
         h+=`<label><input type="radio" name="${nm}" value="${ci}" data-k="${it.key}" ${String(draft.ans[it.key])===String(ci)?"checked":""}><span class="no">(${pos+1})</span><span>${esc(it.q.c[ci])}</span></label>`;
       });
       h+=`</div></div>`;
@@ -236,7 +288,7 @@ async function quiz(id){
   app.innerHTML=h; bar.hidden=false;
   document.getElementById("tot").textContent=items.length;
   disarm(); update();
-  const tick=()=>{document.getElementById("hint").textContent=`経過 ${hms(Date.now()-draft.start)}${id==="review"?"":" / 3:00:00"}`};
+  const tick=()=>{document.getElementById("hint").textContent=`経過 ${hms(Date.now()-draft.start)}${SETS.some(s=>s.id===id)?" / 3:00:00":""}`};
   tick(); timer=setInterval(tick,1000);
 }
 function onPick(e){
@@ -264,17 +316,23 @@ document.getElementById("grade").addEventListener("click",()=>{
 
 function grade(){
   const {id,items,draft}=cur;
-  const sec=R.map(()=>[0,0]), wrong=[], ans={};
+  const sec=R.map(()=>[0,0]), wrong=[], ans={}, qs={};
   items.forEach(it=>{
-    const v=draft.ans[it.key]; ans[it.key]=v===undefined?null:v;
+    const v=draft.ans[it.key]; ans[it.key]=v===undefined?null:v; qs[it.key]=it.q;
     sec[it.q.r][1]++;
     if(v===it.q.a)sec[it.q.r][0]++; else wrong.push(it.key);
   });
-  const res={id,at:new Date().toISOString(),elapsed:Date.now()-draft.start,ans,wrong,sec,keys:items.map(it=>it.key)};
-  const note=store("eisei-note")||{};
+  const res={id,at:new Date().toISOString(),elapsed:Date.now()-draft.start,ans,wrong,sec,keys:items.map(it=>it.key),qs};
+  const note=store("eisei-note")||{}, dnote=store("eisei-dnote")||{};
   if(id==="review"){
     const correct=new Set(items.map(it=>it.key).filter(k=>!wrong.includes(k)));
     for(const sid of Object.keys(note)){note[sid]=note[sid].filter(i=>!correct.has(sid+":"+i));if(!note[sid].length)delete note[sid]}
+    for(const k of Object.keys(dnote))if(correct.has(k))delete dnote[k];
+  }else if(id==="daily"){
+    res.date=draft.date; res.c=items.length-wrong.length; res.n=items.length;
+    items.forEach(it=>{if(wrong.includes(it.key))dnote[it.key]=it.q;else delete dnote[it.key]});
+    const dh=store("eisei-dhist")||{};
+    if(!dh[res.date]){dh[res.date]={c:res.c,n:res.n};const ks=Object.keys(dh).sort();while(ks.length>60)delete dh[ks.shift()];store("eisei-dhist",dh)}
   }else{
     res.pts=sec.reduce((s,[c],r)=>s+c*R[r].p,0);
     const max=sec.reduce((s,[,n],r)=>s+n*R[r].p,0);
@@ -282,7 +340,7 @@ function grade(){
     note[id]=wrong.map(k=>+k.split(":")[1]); if(!note[id].length)delete note[id];
     const hist=store("eisei-hist-"+id)||[]; hist.push({at:res.at,pts:res.pts,pass:res.pass}); store("eisei-hist-"+id,hist.slice(-20));
   }
-  store("eisei-note",note);
+  store("eisei-note",note); store("eisei-dnote",dnote);
   store("eisei-res-"+id,res);
   store(cur.dk,null); cur=null;
   location.hash="#/r/"+id;
@@ -292,19 +350,26 @@ function grade(){
 async function result(id){
   const res=store("eisei-res-"+id); if(!res){location.hash="#/";return}
   const items=[];
-  for(const k of res.keys){const [sid,i]=k.split(":");const d=await loadSet(sid);const q=d.questions[+i];if(q)items.push({key:k,q,label:id==="review"?`${setTitle(sid).replace("模試 ","")} 問${+i+1}`:`問${+i+1}`})}
+  for(const k of res.keys){const q=(res.qs&&res.qs[k])||await qOf(k);if(q)items.push({key:k,q,label:labelOf(k,id==="review")})}
   const byKey=Object.fromEntries(items.map(it=>[it.key,it]));
+  const ok=items.length-res.wrong.length;
   let h;
   if(id==="review"){
-    const ok=items.length-res.wrong.length;
     h=`<header><span class="eyebrow">まちがいノート 結果</span></header><div class="scorecard"><div class="score">${ok}<small> / ${items.length}問 正解</small></div>
     <span class="verdict ${res.wrong.length?"fail":"pass"}">${res.wrong.length?`あと${res.wrong.length}問がノートに残っています`:"ノートの問題をすべてクリア"}</span>
     <span class="meta">所要 ${hms(res.elapsed)}</span></div>`;
+  }else if(id==="daily"){
+    const rate=Math.round(ok/items.length*100);
+    h=`<header><span class="eyebrow">${fmtDay(res.date)}の問題 結果</span></header><div class="scorecard"><div class="score">${ok}<small> / ${items.length}問 正解</small></div>
+    <span class="verdict ${rate>=60?"pass":"fail"}">正答率 ${rate}%${rate>=60?"　本番の合格ペース":"　本番の60%に届かず"}</span>
+    <span class="meta">所要 ${hms(res.elapsed)}</span></div><h2>範囲別</h2><table><tr><th>範囲</th><th class="r">正解</th></tr>`;
+    res.sec.forEach(([c,n],r)=>{if(!n)return;const okr=c/n>=0.4;h+=`<tr><td>${rname(r)}<div class="meter ${okr?"":"ng"}"><i style="width:${c/n*100}%"></i><b></b></div></td><td class="r"><span class="${okr?"ok":"ng"}">${c}</span><small>/${n}</small></td></tr>`});
+    h+=`</table>`;
   }else{
     h=`<header><span class="eyebrow">${esc(setTitle(id))} 結果　${md(res.at)}</span></header>
     <div class="scorecard"><div class="score">${res.pts}<small> / ${res.max}点</small></div>
     <span class="verdict ${res.pass?"pass":"fail"}">${res.pass?"合格ライン到達":"不合格"}</span>
-    <span class="meta">正解 ${items.length-res.wrong.length} / ${items.length}問　・　合格点 ${Math.ceil(res.max*0.6)}点　・　所要 ${hms(res.elapsed)}</span></div>
+    <span class="meta">正解 ${ok} / ${items.length}問　・　合格点 ${Math.ceil(res.max*0.6)}点　・　所要 ${hms(res.elapsed)}</span></div>
     <h2>範囲別<span>縦線が足切りの40%</span></h2><table><tr><th>範囲</th><th class="r">正解</th><th class="r">得点</th></tr>`;
     res.sec.forEach(([c,n],r)=>{
       const p=c*R[r].p, m=n*R[r].p, okr=p>=m*0.4;
@@ -320,9 +385,9 @@ async function result(id){
   if(id!=="review")h+=`<button class="sub" data-go="${id}">もう一度最初から</button>`;
   h+=`<a class="btn sub" href="#/">一覧へ</a></div>`;
   const card=it=>{
-    const v=res.ans[it.key], ok=v===it.q.a;
+    const v=res.ans[it.key], good=v===it.q.a;
     return `<div class="wrong"><span class="tag">${esc(it.label)}　${rname(it.q.r)}</span><span>${esc(it.q.q)}</span>
-    ${ok?"":`<span class="you">あなたの答え：${v===null||v===undefined?"（空欄）":esc(it.q.c[v])}</span>`}
+    ${good?"":`<span class="you">あなたの答え：${v===null||v===undefined?"（空欄）":esc(it.q.c[v])}</span>`}
     <span class="ans">正解：${esc(it.q.c[it.q.a])}</span>${it.q.e?`<span class="exp"><b>解説</b>　${esc(it.q.e)}</span>`:""}</div>`;
   };
   if(res.wrong.length){h+=`<h2>まちがえた問題<span>${res.wrong.length}問</span></h2>`;res.wrong.forEach(k=>{if(byKey[k])h+=card(byKey[k])})}
