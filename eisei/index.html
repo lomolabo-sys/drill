@@ -100,6 +100,28 @@ td small{color:var(--muted)}
 details{margin-top:12px}
 summary{cursor:pointer;color:var(--accent);font-weight:700;font-size:15px;padding:6px 0}
 .center{padding:40px 0;text-align:center;color:var(--muted)}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:0 -16px 10px;padding:2px 16px}
+.tabs a{flex:none;font-size:13px;font-weight:700;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);text-decoration:none}
+.tabs a.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.tabs.small{margin:2px 0 0;padding:0;flex-wrap:wrap}
+.card.hero{border-color:var(--accent)}
+.card .meter b{display:none}
+.pstat{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;font-variant-numeric:tabular-nums}
+.pstat span{border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:var(--surface);color:var(--muted)}
+.pstat .sess{color:var(--accent);border-color:var(--accent);font-weight:700}
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{display:flex;gap:10px;align-items:flex-start;text-align:left;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--ground);color:var(--ink);font-weight:400;font-size:15px;line-height:1.6;width:100%}
+.opt .no{font-weight:700;color:var(--muted);flex:none}
+.opt:disabled{cursor:default;opacity:.75}
+.opt.right{border-color:var(--ok);background:var(--ok-soft);opacity:1}
+.opt.right .no{color:var(--ok)}
+.opt.bad{border-color:var(--ng);background:var(--ng-soft);opacity:1}
+.opt.bad .no{color:var(--ng)}
+#fb{display:flex;flex-direction:column;gap:6px}
+#fb .verdict{align-self:flex-start}
+#fb .ans{color:var(--ok);font-weight:700;font-size:14px}
+#fb .exp{font-size:15px;line-height:1.8;background:var(--accent-soft);border-radius:8px;padding:10px 12px}
+#fb .exp b{color:var(--accent)}
 .hist{display:flex;gap:6px;flex-wrap:wrap}
 .hist span{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:var(--surface);font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
@@ -111,7 +133,7 @@ html{scroll-behavior:smooth}
 <div class="bar" id="bar" hidden>
   <div class="bar-in">
     <div class="count"><b id="cnt">0</b> / <span id="tot">44</span> 問<br><span id="hint">経過 0:00</span></div>
-    <button id="grade" type="button">採点する</button>
+    <button id="grade" type="button">採点する</button><button id="pnext" type="button" hidden>次の問題 →</button>
   </div>
 </div>
 
@@ -151,16 +173,18 @@ function setTitle(id){const s=SETS.find(x=>x.id===id);return s?s.title:id}
 
 /* ---------- routing ---------- */
 async function route(){
-  clearInterval(timer); bar.hidden=true; armed=false;
+  clearInterval(timer); bar.hidden=true; armed=false; document.getElementById("pnext").hidden=true; document.getElementById("grade").hidden=false; if(P)P.done=false;
   const [,v,id]=(location.hash||"#/").split("/");
   try{
     if(v==="q")await quiz(id);
+    else if(v==="p")await practice(id);
     else if(v==="r")await result(id);
     else home();
   }catch(e){app.innerHTML='<p class="center">問題を読みこめませんでした。電波のいい所で開き直してください。</p>'}
   window.scrollTo(0,0);
 }
 window.addEventListener("hashchange",route);
+document.getElementById("pnext").addEventListener("click",()=>nextP());
 app.addEventListener("change",e=>onPick(e));
 
 /* ---------- daily ---------- */
@@ -184,13 +208,89 @@ function noteKeys(){
 function labelOf(key,inReview){
   const p=key.split(":");
   if(p[0]==="d")return inReview?`${shortDay(p[1])}の問題 ${+p[2]+1}`:`問${+p[2]+1}`;
+  if(!SETS.some(s=>s.id===p[0]))return inReview?`問題集 ${p[0].toUpperCase()}-${+p[1]+1}`:`問${+p[1]+1}`;
   return inReview?`${setTitle(p[0]).replace("模試 ","")} 問${+p[1]+1}`:`問${+p[1]+1}`;
 }
 async function qOf(key){
+  const dn=store("eisei-dnote")||{}; if(dn[key])return dn[key];
   const p=key.split(":");
-  if(p[0]==="d"){const dn=store("eisei-dnote")||{};if(dn[key])return dn[key];const d=await loadDaily();return d&&d.date===p[1]?d.questions[+p[2]]:null}
-  const d=await loadSet(p[0]);return d.questions[+p[1]];
+  if(SETS.some(s=>s.id===p[0])){const d=await loadSet(p[0]);return d.questions[+p[1]]}
+  if(p[0]==="d"){const d=await loadDaily();if(d&&d.date===p[1])return d.questions[+p[2]]}
+  const all=await loadAll(); const hit=all.find(x=>x.key===key); return hit?hit.q:null;
 }
+
+/* ---------- question bank (all questions) ---------- */
+let ALL=null;
+async function loadAll(){
+  if(ALL)return ALL;
+  const out=[], seen=new Set(), add=(key,q)=>{if(!seen.has(key)){seen.add(key);out.push({key,q})}};
+  for(const s of SETS){try{const d=await loadSet(s.id);d.questions.forEach((q,i)=>add(s.id+":"+i,q))}catch(e){}}
+  let files=[]; try{files=(await getJSON("bank/index.json")).files}catch(e){}
+  const got=await Promise.allSettled(files.map(f=>getJSON("bank/"+f.file)));
+  got.forEach((g,j)=>{if(g.status==="fulfilled")g.value.questions.forEach((q,i)=>add(files[j].prefix+":"+i,q))});
+  const d=await loadDaily(); if(d)d.questions.forEach((q,i)=>add(`d:${d.date}:${i}`,q));
+  return ALL=out;
+}
+function qstats(){return store("eisei-qs")||{}}
+
+/* ---------- practice (one by one) ---------- */
+const PRL=[["all","全範囲"],["0","法令・有害"],["1","衛生・有害"],["2","法令"],["3","衛生"],["4","生理"],["wrong","まちがい"]];
+let P=null;
+function poolFor(mode,all){
+  if(mode==="wrong"){const nk=new Set(noteKeys()), st=qstats();return all.filter(x=>nk.has(x.key)||(st[x.key]&&st[x.key].last===false))}
+  if(mode==="all")return all;
+  return all.filter(x=>String(x.q.r)===String(mode));
+}
+function pickNext(pool,avoid){
+  const st=qstats(), rnd=a=>a[Math.floor(Math.random()*a.length)];
+  const ok=pool.filter(x=>!avoid.includes(x.key)); const base=ok.length?ok:pool;
+  const unseen=base.filter(x=>!st[x.key]), wrong=base.filter(x=>st[x.key]&&st[x.key].last===false);
+  if(wrong.length&&(!unseen.length||Math.random()<0.3))return rnd(wrong);
+  if(unseen.length)return rnd(unseen);
+  const sorted=[...base].sort((a,b)=>(st[a.key].t||0)-(st[b.key].t||0));
+  return rnd(sorted.slice(0,Math.max(1,Math.ceil(sorted.length/3))));
+}
+async function practice(mode){
+  mode=mode||"all";
+  const all=await loadAll();
+  if(!P||P.mode!==mode)P={mode,n:0,ok:0,recent:[]};
+  const pool=poolFor(mode,all);
+  const st=qstats();
+  const tabs=PRL.map(([k,v])=>`<a href="#/p/${k}" class="${String(k)===String(mode)?"on":""}">${v}</a>`).join("");
+  let h=`<header><span class="eyebrow">一問一答　答えるとすぐ解説</span><h1>どんどん解く</h1>
+  <p class="rule"><a href="#/" style="color:var(--accent)">一覧へ戻る</a></p></header><div class="tabs">${tabs}</div>`;
+  if(!pool.length){app.innerHTML=h+`<p class="center">${mode==="wrong"?"まちがえた問題はありません。":"問題がありません。"}</p>`;return}
+  const seen=pool.filter(x=>st[x.key]).length, mastered=pool.filter(x=>st[x.key]&&st[x.key].last).length;
+  const it=pickNext(pool,P.recent);
+  P.recent=[it.key,...P.recent].slice(0,Math.min(15,Math.floor(pool.length/2)));
+  P.cur=it;
+  h+=`<div class="pstat"><span>この範囲 ${pool.length}問</span><span>解いた ${seen}</span><span>直近で正解 ${mastered}</span>${P.n?`<span class="sess">今回 ${P.ok}/${P.n}</span>`:""}</div>
+  <div class="q"><div class="qhead"><span class="num">${R[it.q.r].short}</span><p class="qtext">${esc(it.q.q)}</p></div><div class="opts">`;
+  const ord=order(it.key+"#"+Date.now(),it.q.c.length);
+  ord.forEach((ci,pos)=>h+=`<button type="button" class="opt" data-ci="${ci}"><span class="no">(${pos+1})</span><span>${esc(it.q.c[ci])}</span></button>`);
+  h+=`</div><div id="fb" hidden></div></div>`;
+  app.innerHTML=h;
+  app.querySelectorAll(".opt").forEach(b=>b.onclick=()=>answerP(+b.dataset.ci));
+}
+function answerP(ci){
+  if(!P||!P.cur||P.done)return; P.done=true;
+  const {key,q}=P.cur, good=ci===q.a;
+  P.n++; if(good)P.ok++;
+  const st=qstats(), s=st[key]||{n:0,ok:0}; s.n++; if(good)s.ok++; s.last=good; s.t=Date.now(); st[key]=s; store("eisei-qs",st);
+  const dn=store("eisei-dnote")||{}, note=store("eisei-note")||{};
+  if(good){delete dn[key];const [sid,i]=key.split(":");if(note[sid]){note[sid]=note[sid].filter(x=>x!==+i);if(!note[sid].length)delete note[sid]}}
+  else dn[key]=q;
+  store("eisei-dnote",dn); store("eisei-note",note);
+  app.querySelectorAll(".opt").forEach(b=>{b.disabled=true;const c=+b.dataset.ci;if(c===q.a)b.classList.add("right");else if(c===ci)b.classList.add("bad")});
+  const fb=document.getElementById("fb");
+  fb.innerHTML=`<div class="verdict ${good?"pass":"fail"}">${good?"正解":"不正解"}</div>${good?"":`<span class="ans">正解：${esc(q.c[q.a])}</span>`}${q.e?`<span class="exp"><b>解説</b>　${esc(q.e)}</span>`:""}`;
+  fb.hidden=false;
+  bar.hidden=false; document.getElementById("pnext").hidden=false; document.getElementById("grade").hidden=true;
+  document.getElementById("cnt").textContent=P.ok; document.getElementById("tot").textContent=P.n;
+  document.getElementById("hint").textContent=`今回の正答率 ${Math.round(P.ok/P.n*100)}%`;
+  fb.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+function nextP(){if(!P)return;P.done=false;bar.hidden=true;document.getElementById("pnext").hidden=true;document.getElementById("grade").hidden=false;practice(P.mode);window.scrollTo(0,0)}
 
 /* ---------- home ---------- */
 async function home(){
@@ -198,6 +298,15 @@ async function home(){
   const dh=store("eisei-dhist")||{};
   let h=`<header><span class="eyebrow">第一種衛生管理者</span><h1>衛生管理者 問題集</h1>
   <p class="rule">本番の合格ライン：<b>5つの範囲すべてで40%以上</b>、かつ<b>合計60%以上</b>。</p></header>`;
+  {
+    const all=await loadAll(), st=qstats();
+    const seen=all.filter(x=>st[x.key]).length, good=all.filter(x=>st[x.key]&&st[x.key].last).length;
+    h+=`<div class="card hero"><div class="row"><span class="t">どんどん解く</span><span class="meta">全${all.length}問</span></div>
+    <span class="meta">1問ずつ、答えるとすぐ正解と解説。まだ解いていない問題と、間違えた問題から優先して出ます。</span>
+    <div class="meter"><i style="width:${all.length?seen/all.length*100:0}%"></i></div><span class="meta">解いた ${seen}問　・　直近で正解 ${good}問</span>
+    <div class="row"><a class="btn" href="#/p/all">全範囲から解く</a></div>
+    <div class="tabs small">${PRL.filter(([k])=>k!=="all").map(([k,v])=>`<a href="#/p/${k}">${v}</a>`).join("")}</div></div>`;
+  }
   if(daily){
     const res=store("eisei-res-daily"), done=res&&res.date===daily.date, dr=store("eisei-draft-daily");
     const st=streak(dh);
