@@ -212,7 +212,7 @@ function renderResult(r){
     html+=`<h2>まちがえた問題<span>${r.wrong.length}問</span></h2>`;
     r.wrong.forEach(w=>html+=`<div class="wrong"><span class="tag">${w.s}</span><span>${esc(w.q)}</span><span class="you">きみの答え：${esc(w.you)}</span><span class="ans">正解：${esc(w.ans)}</span>${expOf(w)?`<span class="exp"><b>解説</b>　${esc(expOf(w))}</span>`:""}</div>`);
   }
-  html+=`<p class="rule">明日の朝、新しい50問に変わります。</p></div>`;
+  html+=`<p class="rule">明日の朝、新しい50問に変わります。</p><p class="stamp">ページ版 v3（解説つき）</p></div>`;
   app.innerHTML=html;
 }
 load();
