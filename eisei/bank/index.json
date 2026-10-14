@@ -56,6 +56,14 @@
 {
 "file": "b06.json",
 "prefix": "b06"
+},
+{
+"file": "d-2026-10-15.json",
+"prefix": "d:2026-10-15"
+},
+{
+"file": "b07.json",
+"prefix": "b07"
 }
 ]
 }
