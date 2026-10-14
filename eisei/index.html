@@ -124,6 +124,23 @@ summary{cursor:pointer;color:var(--accent);font-weight:700;font-size:15px;paddin
 #fb .exp b{color:var(--accent)}
 .hist{display:flex;gap:6px;flex-wrap:wrap}
 .hist span{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:var(--surface);font-variant-numeric:tabular-nums}
+.sheet h2{border-bottom:2px solid var(--accent);padding-bottom:4px}
+.pt{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--ng);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;flex-direction:column;gap:4px;break-inside:avoid}
+.pt.done{border-left-color:var(--ok)}
+.pt .qq{font-size:13px;color:var(--muted);line-height:1.6}
+.pt .right{font-weight:700;line-height:1.6}
+.pt .right b{font-size:12px;margin-right:6px}
+.pt .right b.ok{color:var(--ok)}
+.pt .right b.ng{color:var(--ng)}
+.pt .ex{font-size:14px;line-height:1.75}
+.pt .cnt{font-size:11px;color:var(--muted)}
+@media print{
+  body{background:#fff;color:#000;padding:0}
+  .noprint,nav,.bar{display:none!important}
+  .wrap{padding:0;max-width:none}
+  .pt{border-color:#999}
+  h2{break-after:avoid}
+}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 html{scroll-behavior:smooth}
 </style>
@@ -178,6 +195,7 @@ async function route(){
   try{
     if(v==="q")await quiz(id);
     else if(v==="p")await practice(id);
+    else if(v==="s")await study(id||"todo");
     else if(v==="r")await result(id);
     else home();
   }catch(e){app.innerHTML='<p class="center">問題を読みこめませんでした。電波のいい所で開き直してください。</p>'}
@@ -232,6 +250,40 @@ async function loadAll(){
   return ALL=out;
 }
 function qstats(){return store("eisei-qs")||{}}
+
+/* ---------- study sheet from mistakes ---------- */
+async function study(mode){
+  const all=await loadAll(), st=qstats(), nk=new Set(noteKeys()), dn=store("eisei-dnote")||{};
+  const map=new Map(all.map(x=>[x.key,x.q]));
+  for(const k of Object.keys(dn))if(!map.has(k))map.set(k,dn[k]);
+  const items=[];
+  for(const [k,q] of map){
+    const s=st[k]||{}, miss=(s.n||0)-(s.ok||0), open=nk.has(k)||s.last===false;
+    if(!open&&miss<=0)continue;
+    items.push({k,q,miss:Math.max(miss,open?1:0),open});
+  }
+  const list=mode==="all"?items:items.filter(x=>x.open);
+  let h=`<header class="noprint"><span class="eyebrow">まちがいから作る資料</span><h1>まちがいまとめ</h1>
+  <p class="rule"><a href="#/" style="color:var(--accent)">一覧へ戻る</a></p></header>
+  <div class="tabs noprint"><a href="#/s/todo" class="${mode!=="all"?"on":""}">まだ苦手（${items.filter(x=>x.open).length}）</a><a href="#/s/all" class="${mode==="all"?"on":""}">克服した分も（${items.length}）</a></div>`;
+  if(!list.length){app.innerHTML=h+`<p class="center">${items.length?"苦手な問題はすべて克服しました。":"まだ間違えた問題がありません。模試や「どんどん解く」を解くと、ここにたまります。"}</p>`;return}
+  h+=`<div class="row noprint" style="margin-bottom:12px"><button type="button" id="pr">印刷・PDF保存</button><button type="button" class="sub" id="cp">テキストをコピー</button></div>
+  <div class="sheet"><p class="rule" style="margin-bottom:8px">第一種衛生管理者　まちがいまとめ（${list.length}項目・${new Date().toLocaleDateString("ja-JP")}）　赤線＝まだ苦手、緑線＝克服済み。間違えた回数が多い順。</p>`;
+  let txt=`第一種衛生管理者 まちがいまとめ（${list.length}項目）\n`;
+  R.forEach((x,r)=>{
+    const its=list.filter(i=>i.q.r===r).sort((a,b)=>b.miss-a.miss); if(!its.length)return;
+    h+=`<h2>${rname(r)}<span>${its.length}項目</span></h2>`; txt+=`\n■ ${rname(r)}\n`;
+    its.forEach(i=>{
+      const q=i.q, right=q.c[q.a], neg=/誤っている|誤りの/.test(q.q), notx=!neg&&/該当しない|ないもの|必要ない|しなくてもよい|対象とならない/.test(q.q), lab=neg?"これが誤り":notx?"答え（当てはまらないもの）":"正解";
+      h+=`<div class="pt ${i.open?"":"done"}"><span class="qq">${esc(q.q)}</span><span class="right"><b class="${neg?"ng":"ok"}">${lab}</b>${esc(right)}</span>${q.e?`<span class="ex">${esc(q.e)}</span>`:""}<span class="cnt">間違えた回数 ${i.miss}${i.open?"":"　・　克服済み"}</span></div>`;
+      txt+=`・問：${q.q}\n　${lab}：${right}\n　解説：${q.e||""}\n　（間違い${i.miss}回${i.open?"":"・克服済み"}）\n`;
+    });
+  });
+  h+=`</div>`;
+  app.innerHTML=h;
+  document.getElementById("pr").onclick=()=>window.print();
+  document.getElementById("cp").onclick=async e=>{try{await navigator.clipboard.writeText(txt);e.target.textContent="コピーしました"}catch(err){e.target.textContent="コピーできませんでした"}};
+}
 
 /* ---------- practice (one by one) ---------- */
 const PRL=[["all","全範囲"],["0","法令・有害"],["1","衛生・有害"],["2","法令"],["3","衛生"],["4","生理"],["wrong","まちがい"]];
@@ -306,6 +358,7 @@ async function home(){
     <div class="meter"><i style="width:${all.length?seen/all.length*100:0}%"></i></div><span class="meta">解いた ${seen}問　・　直近で正解 ${good}問</span>
     <div class="row"><a class="btn" href="#/p/all">全範囲から解く</a></div>
     <div class="tabs small">${PRL.filter(([k])=>k!=="all").map(([k,v])=>`<a href="#/p/${k}">${v}</a>`).join("")}</div></div>`;
+    h+=`<div class="card"><div class="row"><span class="t">まちがいまとめ</span></div><span class="meta">これまで間違えた問題の「正しい知識」と解説を、範囲ごとに1枚の資料にまとめます。印刷・PDF保存もできます。</span><div class="row"><a class="btn" href="#/s/todo">まとめを開く</a></div></div>`;
   }
   if(daily){
     const res=store("eisei-res-daily"), done=res&&res.date===daily.date, dr=store("eisei-draft-daily");
