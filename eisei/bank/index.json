@@ -168,6 +168,14 @@
 {
 "file": "b20.json",
 "prefix": "b20"
+},
+{
+"file": "b21.json",
+"prefix": "b21"
+},
+{
+"file": "b22.json",
+"prefix": "b22"
 }
 ]
 }
