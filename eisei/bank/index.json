@@ -184,6 +184,14 @@
 {
 "file": "b23.json",
 "prefix": "b23"
+},
+{
+"file": "d-2026-10-30.json",
+"prefix": "d:2026-10-30"
+},
+{
+"file": "b24.json",
+"prefix": "b24"
 }
 ]
 }
