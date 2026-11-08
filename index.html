@@ -110,8 +110,8 @@ function store(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 function rng(seed){let h=2166136261;for(const ch of seed){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return()=>{h^=h<<13;h^=h>>>17;h^=h<<5;return((h>>>0)%10000)/10000}}
 function order(i,n){const r=rng(data.date+"#"+i),a=[...Array(n).keys()];for(let k=n-1;k>0;k--){const j=Math.floor(r()*(k+1));[a[k],a[j]]=[a[j],a[k]]}return a}
-function norm(s){return String(s).normalize("NFKC").trim().toLowerCase().replace(/[\s。．.、,]/g,"")}
-function numNorm(s){return norm(s).replace(/[−–―‐ー]/g,"-")}
+function norm(s){return String(s).normalize("NFKC").trim().toLowerCase().replace(/[\s\u200b-\u200d\ufeff。．.、,「」『』]/g,"").replace(/薄い/g,"うすい").replace(/激しく/g,"はげしく")}
+function numNorm(s){return norm(s).replace(/[−–―‐ー]/g,"-").replace(/(-?)(\d+)分の(\d+)/g,"$1$3/$2").replace(/^マイナス/,"-")}
 function correct(q,i){
   const v=answers[i]; if(v===undefined||v==="")return false;
   if(q.t==="c")return Number(v)===q.a;
