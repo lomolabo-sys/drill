@@ -107,6 +107,11 @@ const app=document.getElementById("app"), bar=document.getElementById("bar");
 let data=null, answers={}, armed=false;
 
 function store(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(k));localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
+const FORM="https://docs.google.com/forms/d/e/1FAIpQLSchMFMKuWYJIpmvW2Id0hxJ9Ne9zTKwTAww8iFnjaFe-2hGOQ/formResponse", ENTRY="entry.1100203182";
+function devId(){let d=store("dev-id");if(!d){d=Math.random().toString(36).slice(2,6).toUpperCase();store("dev-id",d)}return d}
+function devName(){const u=navigator.userAgent;const os=/iPhone|iPad/.test(u)?"iPhone":/Android/.test(u)?"Android":/Mac/.test(u)?"Mac":/Windows/.test(u)?"Windows":"その他";const br=/Line\//.test(u)?"LINE":/CriOS|Chrome/.test(u)?"Chrome":/FxiOS|Firefox/.test(u)?"Firefox":/Safari/.test(u)?"Safari":"その他";return os+"・"+br}
+function hm(d){d=new Date(d);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`}
+function sendLog(text){try{fetch(FORM,{method:"POST",mode:"no-cors",keepalive:true,body:new URLSearchParams({[ENTRY]:text})}).catch(()=>{})}catch(e){}}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 function rng(seed){let h=2166136261;for(const ch of seed){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return()=>{h^=h<<13;h^=h>>>17;h^=h<<5;return((h>>>0)%10000)/10000}}
 function order(i,n){const r=rng(data.date+"#"+i),a=[...Array(n).keys()];for(let k=n-1;k>0;k--){const j=Math.floor(r()*(k+1));[a[k],a[j]]=[a[j],a[k]]}return a}
@@ -128,6 +133,8 @@ async function load(){
   const done=store("result-"+(data.id||data.date));
   if(done){renderResult(done);return}
   answers=store("draft-"+(data.id||data.date))||{};
+  const sk="start-"+(data.id||data.date);
+  if(!store(sk)){store(sk,new Date().toISOString());sendLog(`${data.date} 問題を開いた（この端末で初めて） 端末:${devId()} ${devName()}`)}
   renderQuiz();
 }
 
@@ -192,6 +199,8 @@ document.getElementById("grade").addEventListener("click",()=>{
   });
   const res={date:data.date,score,total:data.questions.length,pass:data.pass,per,wrong,at:new Date().toISOString()};
   store("result-"+(data.id||data.date),res);
+  const st=store("start-"+(data.id||data.date)), mins=st?Math.round((Date.now()-new Date(st))/60000):"?";
+  sendLog(`${data.date} 採点 ${score}/${res.total}点（${score>=data.pass?"合格":"不合格"}） 端末:${devId()} ${devName()} 開始${st?hm(st):"?"} 採点${hm(res.at)} かかった時間${mins}分 空欄${data.questions.length-update()}問`);
   renderResult(res); window.scrollTo(0,0);
 });
 
@@ -212,7 +221,7 @@ function renderResult(r){
     html+=`<h2>まちがえた問題<span>${r.wrong.length}問</span></h2>`;
     r.wrong.forEach(w=>html+=`<div class="wrong"><span class="tag">${w.s}</span><span>${esc(w.q)}</span><span class="you">きみの答え：${esc(w.you)}</span><span class="ans">正解：${esc(w.ans)}</span>${expOf(w)?`<span class="exp"><b>解説</b>　${esc(expOf(w))}</span>`:""}</div>`);
   }
-  html+=`<p class="rule">明日の朝、新しい50問に変わります。</p><p class="stamp">ページ版 v3（解説つき）</p></div>`;
+  html+=`<p class="rule">明日の朝、新しい50問に変わります。</p><p class="stamp">ページ版 v4</p></div>`;
   app.innerHTML=html;
 }
 load();
