@@ -312,6 +312,14 @@
 {
 "file": "b39.json",
 "prefix": "b39"
+},
+{
+"file": "d-2026-11-15.json",
+"prefix": "d:2026-11-15"
+},
+{
+"file": "b40.json",
+"prefix": "b40"
 }
 ]
 }
