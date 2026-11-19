@@ -23,6 +23,7 @@
   {"r":3,"t":"RNN・LSTM・GRU","kw":["RNN","LSTM","GRU","ゲート","BPTT","双方向","Seq2Seq","系列"]},
   {"r":3,"t":"Attention・Transformer","kw":["Attention","アテンション","Transformer","Self-Attention","自己注意","マルチヘッド","位置エンコーディング","Query","エンコーダ・デコーダ"]},
   {"r":3,"t":"オートエンコーダ・表現学習","kw":["オートエンコーダ","自己符号化","VAE","潜在変数","表現学習","事前学習"]},
+  {"r":3,"t":"データ拡張の手法","kw":["データ拡張","Mixup","Cutout","CutMix","Random Erasing","RandAugment"]},
   {"r":4,"t":"画像認識・物体検出・セグメンテーション","kw":["物体検出","YOLO","R-CNN","SSD","セグメンテーション","U-Net","Mask","FCN","姿勢推定","OpenPose","ViT","Vision Transformer"]},
   {"r":4,"t":"自然言語処理の基礎（単語埋め込み）","kw":["word2vec","分散表現","Bag of Words","TF-IDF","形態素","n-gram","スキップグラム","CBOW","fastText","ELMo"]},
   {"r":4,"t":"事前学習言語モデル（BERT・GPT）","kw":["BERT","GPT","マスク","ファインチューニング","転移学習","事前学習済み","次文予測"]},
